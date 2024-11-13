@@ -364,7 +364,7 @@ def render_header():
     """Render application header"""
     col1, col2 = st.columns([3, 1])
     with col1:
-        logo_path = "Smeimge.jpg"
+        logo_path = "smeimge.jpg"
         if os.path.exists(logo_path):
             st.image(logo_path, width=100)
     with col2:
