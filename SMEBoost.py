@@ -58,53 +58,50 @@ def business_priority(business_info, openai_api_key):
 
 def get_specific_suggestions(business_info, suggestion_type, openai_api_key):
     """
-    Get specific business suggestions based on type and context
+    Get specific suggestions following the exact required format
     
     Args:
-        business_info (str): Business priorities and context
-        suggestion_type (str): Type of analysis needed
+        business_info (str): Business priorities from previous responses
+        suggestion_type (str): Type of analysis (e.g., Business Valuation, Financial Healthcheck)
         openai_api_key (str): OpenAI API key
     """
-    prompt = f"""Based on these specific business priorities:
+    prompt = f"""Based on the user's stated business priorities:
 {business_info}
 
-Provide a detailed {suggestion_type} analysis (maximum 200 words) with these exact sections:
+Provide a {suggestion_type} analysis with exactly these requirements (Maximum 200 words):
 
-1. {suggestion_type} Purposes and Benefits:
-   - List and describe 3-4 specific purposes for conducting this {suggestion_type}
-   - Show exactly how each purpose benefits this business given their priorities
-   - Include concrete examples with numbers based on their situation
+1. List and describe the potential purposes of doing a {suggestion_type} and how it will benefit users
+   - Provide specific purposes tailored to their case
+   - Clearly explain benefits for their situation
+   - Make all examples relevant to their context
 
-2. Strategic Links to Current Priorities:
-   - Explain how {suggestion_type} connects to their stated 6-12 month goals
-   - Show specific linkages between {suggestion_type} and their:
-     * Cost optimization goals
-     * Cash flow targets
-     * Efficiency objectives
-     * Other stated priorities
-   - Include timelines and metrics for implementation
+2. Explain the linkages between what is being answered here and the earlier responses given in terms of the user's priorities in the next 6-12 months
+   - Show direct connections to their stated priorities
+   - Demonstrate how {suggestion_type} supports their goals
+   - Reference specific priorities from their input
 
-3. Required Information Checklist:
-   - List specific documents needed for {suggestion_type}
-   - Detail data requirements from each department
-   - Provide preparation timeline
-   - Note any special requirements based on their context
+3. Provide examples with specific facts and figures
+   - Include concrete numbers and metrics
+   - Use relevant industry benchmarks
+   - Quantify potential benefits
 
-Remember:
-- Reference their actual business priorities in every section
-- Use specific examples from their context
-- Provide concrete figures where possible
-- Keep focus on their stated goals"""
+4. List out the types of information that needs to be ready before a {suggestion_type} is carried out
+   - Required documents
+   - Essential data points
+   - Preparation timeline
 
-    system_prompt = f"""You are analyzing a specific {suggestion_type} case for this business.
+Keep responses specific to their context:
+{business_info}"""
+
+    system_prompt = f"""You are a specialized {suggestion_type} consultant responding to specific business priorities.
 Your task:
-1. Only use their provided business context
-2. Address their actual stated priorities
-3. Include real examples from their situation
-4. Connect everything to their goals
-5. Avoid generic advice
+1. Follow the exact 4-section format provided
+2. Use only information from their business context
+3. Make all examples specific to their situation
+4. Keep within 200 words total
+5. Avoid any generic advice or hypothetical scenarios
 
-Do not use hypothetical examples. If context is unclear, reference their priorities directly."""
+Important: Each section must directly reference the user's stated priorities and goals."""
 
     return get_openai_response(prompt, system_prompt, openai_api_key)
 
