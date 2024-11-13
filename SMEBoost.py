@@ -8,6 +8,12 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+import io
+import datetime
 import io
 import json
 
@@ -51,16 +57,56 @@ def business_priority(business_info, openai_api_key):
     )
 
 def get_specific_suggestions(business_info, suggestion_type, openai_api_key):
-    """Get specific business suggestions based on type"""
-    return get_openai_response(
-        f"Based on: {business_info} please provide examples with specific facts and figures and List out the types of "
-        f"information that needs to be ready before a {suggestion_type} is carried out. Maximum 200 words",
-        f"You are a helpful assistant specialized in providing {suggestion_type} suggestions. List and describe the "
-        f"potential purposes of doing a valuation and how it will benefit users and Explain the linkages between what "
-        f"is being answered here and the earlier responses given in terms of the {business_info} priorities in the "
-        f"next 6 - 12 months",
-        openai_api_key
-    )
+    """
+    Get specific business suggestions based on type and context
+    
+    Args:
+        business_info (str): Business priorities and context
+        suggestion_type (str): Type of analysis needed
+        openai_api_key (str): OpenAI API key
+    """
+    prompt = f"""Based on these specific business priorities:
+{business_info}
+
+Provide a detailed {suggestion_type} analysis (maximum 200 words) with these exact sections:
+
+1. {suggestion_type} Purposes and Benefits:
+   - List and describe 3-4 specific purposes for conducting this {suggestion_type}
+   - Show exactly how each purpose benefits this business given their priorities
+   - Include concrete examples with numbers based on their situation
+
+2. Strategic Links to Current Priorities:
+   - Explain how {suggestion_type} connects to their stated 6-12 month goals
+   - Show specific linkages between {suggestion_type} and their:
+     * Cost optimization goals
+     * Cash flow targets
+     * Efficiency objectives
+     * Other stated priorities
+   - Include timelines and metrics for implementation
+
+3. Required Information Checklist:
+   - List specific documents needed for {suggestion_type}
+   - Detail data requirements from each department
+   - Provide preparation timeline
+   - Note any special requirements based on their context
+
+Remember:
+- Reference their actual business priorities in every section
+- Use specific examples from their context
+- Provide concrete figures where possible
+- Keep focus on their stated goals"""
+
+    system_prompt = f"""You are analyzing a specific {suggestion_type} case for this business.
+Your task:
+1. Only use their provided business context
+2. Address their actual stated priorities
+3. Include real examples from their situation
+4. Connect everything to their goals
+5. Avoid generic advice
+
+Do not use hypothetical examples. If context is unclear, reference their priorities directly."""
+
+    return get_openai_response(prompt, system_prompt, openai_api_key)
 
 def get_company_summary(profile_info, openai_api_key):
     """Generate comprehensive company summary"""
@@ -115,56 +161,194 @@ def generate_comprehensive_summary(profile_info, business_priorities, company_su
         openai_api_key
     )
 
-def generate_pdf(comprehensive_summary):
-    """Generate PDF report with proper styling and formatting"""
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
+def create_custom_styles():
+    """Create custom styles for the PDF document"""
     styles = getSampleStyleSheet()
     
-    # Custom styles
+    # Title style
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Title'],
         fontSize=24,
-        spaceAfter=30
+        spaceAfter=30,
+        textColor=colors.HexColor('#1a237e'),  # Dark blue
+        alignment=TA_CENTER
     )
     
+    # Subtitle style
+    subtitle_style = ParagraphStyle(
+        'CustomSubtitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        textColor=colors.HexColor('#303f9f'),  # Medium blue
+        spaceBefore=12,
+        spaceAfter=6,
+        alignment=TA_CENTER
+    )
+    
+    # Section heading style
     heading_style = ParagraphStyle(
         'CustomHeading',
         parent=styles['Heading1'],
         fontSize=14,
-        spaceBefore=12,
-        spaceAfter=6
+        textColor=colors.HexColor('#1976d2'),  # Light blue
+        spaceBefore=20,
+        spaceAfter=10,
+        leftIndent=0,
+        borderPadding=(10, 0, 10, 0),
+        borderWidth=0,
+        borderColor=colors.HexColor('#e3f2fd')  # Very light blue
     )
     
+    # Subheading style
+    subheading_style = ParagraphStyle(
+        'CustomSubheading',
+        parent=styles['Heading2'],
+        fontSize=12,
+        textColor=colors.HexColor('#2196f3'),  # Bright blue
+        spaceBefore=15,
+        spaceAfter=8
+    )
+    
+    # Body text style
     content_style = ParagraphStyle(
-        'CustomStyle',
+        'CustomContent',
         parent=styles['Normal'],
         fontSize=11,
         leading=14,
         spaceBefore=6,
-        spaceAfter=6
+        spaceAfter=6,
+        alignment=TA_JUSTIFY,
+        textColor=colors.HexColor('#424242')  # Dark gray
     )
     
+    # List item style
+    list_style = ParagraphStyle(
+        'CustomList',
+        parent=styles['Normal'],
+        fontSize=11,
+        leading=14,
+        leftIndent=20,
+        bulletIndent=10,
+        spaceBefore=3,
+        spaceAfter=3,
+        textColor=colors.HexColor('#424242')  # Dark gray
+    )
+    
+    return {
+        'title': title_style,
+        'subtitle': subtitle_style,
+        'heading': heading_style,
+        'subheading': subheading_style,
+        'content': content_style,
+        'list': list_style
+    }
+
+def create_header_footer(canvas, doc):
+    """Add header and footer to each page"""
+    canvas.saveState()
+    
+    # Header
+    canvas.setFillColor(colors.HexColor('#1a237e'))
+    canvas.setFont('Helvetica-Bold', 10)
+    canvas.drawString(inch, letter[1] - 0.5*inch, "SMEBoost Business Analysis Report")
+    canvas.setFont('Helvetica', 8)
+    canvas.drawRightString(letter[0] - inch, letter[1] - 0.5*inch, 
+                          f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d')}")
+    canvas.line(inch, letter[1] - 0.6*inch, letter[0] - inch, letter[1] - 0.6*inch)
+    
+    # Footer
+    canvas.setFont('Helvetica', 8)
+    canvas.drawString(inch, 0.5*inch, "Confidential & Proprietary")
+    
+    # Center the page number
+    page_num = f"Page {doc.page}"
+    text_width = canvas._fontsize * len(page_num) * 0.5  # Approximate width
+    x = (letter[0] - text_width) / 2
+    canvas.drawString(x, 0.5*inch, page_num)
+    
+    canvas.line(inch, 0.7*inch, letter[0] - inch, 0.7*inch)
+    
+    canvas.restoreState()
+
+def clean_text(text):
+    """Clean text by removing special characters and formatting"""
+    # Remove ### from headings
+    text = text.replace('###', '')
+    # Remove ** from emphasized text
+    text = text.replace('**', '')
+    # Clean up any extra whitespace
+    text = ' '.join(text.split())
+    return text.strip()
+
+def generate_pdf(comprehensive_summary):
+    """Generate enhanced PDF report with proper styling and formatting"""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=inch,
+        leftMargin=inch,
+        topMargin=1.2*inch,
+        bottomMargin=inch
+    )
+    
+    styles = create_custom_styles()
     elements = []
     
-    # Add title and date
-    elements.append(Paragraph("Business Analysis and Advisory Recommendations", title_style))
-    elements.append(Spacer(1, 20))
-    elements.append(Paragraph(f"Generated on: {datetime.datetime.now().strftime('%Y-%m-%d')}", styles['Normal']))
-    elements.append(Spacer(1, 20))
+    # Cover page
+    elements.append(Paragraph("Business Analysis and Advisory Recommendations", styles['title']))
+    elements.append(Spacer(1, 30))
+    elements.append(Paragraph(f"Generated on: {datetime.datetime.now().strftime('%B %d, %Y')}", styles['subtitle']))
+    elements.append(Spacer(1, 60))
+    
+    # Add a decorative line
+    table_style = TableStyle([
+        ('LINEABOVE', (0, 0), (-1, 0), 2, colors.HexColor('#1a237e')),
+        ('LINEBELOW', (0, 0), (-1, 0), 0.5, colors.HexColor('#1a237e'))
+    ])
+    elements.append(Table([['']], colWidths=[400], style=table_style))
+    elements.append(PageBreak())
     
     # Format content sections
     sections = comprehensive_summary.split('\n\n')
     for section in sections:
-        if section.strip():
-            if ':' in section and section.split(':')[0].isupper():
-                elements.append(Paragraph(section, heading_style))
+        if not section.strip():
+            continue
+            
+        if ':' in section:
+            title, content = section.split(':', 1)
+            # Clean both title and content
+            title = clean_text(title)
+            content = clean_text(content)
+            
+            if title.isupper():
+                elements.append(Paragraph(title, styles['heading']))
+                # Add a subtle line under main headings
+                elements.append(Table([['']], colWidths=[400], style=TableStyle([
+                    ('LINEBELOW', (0, 0), (-1, 0), 0.5, colors.HexColor('#e3f2fd'))
+                ])))
+                
+                if content.strip():
+                    # Process potential list items
+                    if '\n-' in content or '\n•' in content:
+                        for item in content.strip().split('\n'):
+                            item = clean_text(item)
+                            if item.startswith('-') or item.startswith('•'):
+                                elements.append(Paragraph(f"•{item[1:]}", styles['list']))
+                            else:
+                                elements.append(Paragraph(item, styles['content']))
+                    else:
+                        elements.append(Paragraph(content, styles['content']))
             else:
-                elements.append(Paragraph(section, content_style))
-            elements.append(Spacer(1, 6))
+                elements.append(Paragraph(f"{title}: {content}", styles['content']))
+        else:
+            cleaned_section = clean_text(section)
+            if cleaned_section:
+                elements.append(Paragraph(cleaned_section, styles['content']))
     
-    doc.build(elements)
+    # Build the PDF with header and footer
+    doc.build(elements, onFirstPage=create_header_footer, onLaterPages=create_header_footer)
     buffer.seek(0)
     return buffer
 
@@ -183,9 +367,11 @@ def render_header():
     """Render application header"""
     col1, col2 = st.columns([3, 1])
     with col1:
-        st.title("💬 SMEBoost Basic Architecture v0.1")
+        logo_path = "Smeimge.jpg"
+        if os.path.exists(logo_path):
+            st.image(logo_path, width=100)
     with col2:
-        logo_path = "OIP.jpeg"
+        logo_path = "finb.jpg"
         if os.path.exists(logo_path):
             st.image(logo_path, width=100)
 
@@ -285,7 +471,7 @@ def render_business_profile_form():
     return None
 
 def main():
-    """Main application function"""
+    """Main application function with improved context handling"""
     initialize_session_state()
     render_header()
     
@@ -300,15 +486,22 @@ def main():
     # Business Priority Form
     business_priorities = render_business_priority_form()
     if business_priorities:
-        business_priority_suggestions = business_priority(f"Business priorities: {business_priorities}", openai_api_key)
+        # Store raw priorities
+        st.session_state.user_data['raw_priorities'] = business_priorities
+        # Get and store priority suggestions
+        priority_suggestions = business_priority(
+            f"Business priorities: {business_priorities}", 
+            openai_api_key
+        )
+        st.session_state.user_data['business_priority_suggestions'] = priority_suggestions
         st.session_state.show_options = True
-        st.session_state.user_data.update({
-            'business_priority_suggestions': business_priority_suggestions
-        })
     
     # Business Options
     if st.session_state.show_options:
-        selected_options = render_business_options(business_priorities, openai_api_key)
+        selected_options = render_business_options(
+            st.session_state.user_data.get('raw_priorities', ''), 
+            openai_api_key
+        )
         if selected_options:
             selected_areas = [opt for opt, selected in selected_options.items() if selected]
             
@@ -317,8 +510,21 @@ def main():
             else:
                 with st.spinner("Generating analysis for selected areas..."):
                     suggestions = {}
+                    # Combine business context for analysis
+                    business_context = f"""
+                    Business Priorities:
+                    {st.session_state.user_data.get('raw_priorities', '')}
+
+                    Priority Analysis:
+                    {st.session_state.user_data.get('business_priority_suggestions', '')}
+                    """
+                    
                     for option in selected_areas:
-                        suggestion = get_specific_suggestions(business_priorities, option, openai_api_key)
+                        suggestion = get_specific_suggestions(
+                            business_context.strip(), 
+                            option,
+                            openai_api_key
+                        )
                         suggestions[f"{option.lower().replace(' ', '_')}_suggestions"] = suggestion
                     
                     st.session_state.user_data.update(suggestions)
