@@ -140,7 +140,7 @@ def render_header():
     """Render application header"""
     col1, col2 = st.columns([3, 1])
     with col1:
-        logo_path = "Smeimge.jpg"
+        logo_path = "smeimge.jpg"
         if os.path.exists(logo_path):
             st.image(logo_path, width=100)
     with col2:
@@ -400,8 +400,8 @@ def create_front_page(styles, profile_info):
     elements = []
     
     # Create a table for the logos
-    if os.path.exists("Smeimge.jpg") and os.path.exists("finb.jpg"):
-        logo_left = Image("Smeimge.jpg", width=2*inch, height=1*inch)
+    if os.path.exists("smeimge.jpg") and os.path.exists("finb.jpg"):
+        logo_left = Image("smeimge.jpg", width=2*inch, height=1*inch)
         logo_right = Image("finb.jpg", width=2*inch, height=1*inch)
         
         logo_table = Table(
@@ -704,8 +704,8 @@ def create_error_pdf():
     elements = []
     
     # Add logos to error page
-    if os.path.exists("Smeimge.jpg") and os.path.exists("finb.jpg"):
-        logo_left = Image("Smeimge.jpg", width=2.5*inch, height=1.5*inch)
+    if os.path.exists("smeimge.jpg") and os.path.exists("finb.jpg"):
+        logo_left = Image("smeimge.jpg", width=2.5*inch, height=1.5*inch)
         logo_right = Image("finb.jpg", width=2.5*inch, height=1.5*inch)
         
         logo_table = Table(
