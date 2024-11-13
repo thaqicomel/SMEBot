@@ -19,7 +19,7 @@ import json
 
 # Constants
 BUSINESS_OPTIONS = {
-    "Business Evaluation": "I want to assess my company's worth, helping me make informed decisions and gain investor trust.",
+    "Business Valuation": "I want to assess my company's worth, helping me make informed decisions and gain investor trust.",
     "Financial Healthcheck": "I want to review my finances, checking assets, debts, cash flow, and overall stability",
     "Business Partnering": "I want to build partnerships to grow, sharing strengths and resources with others for mutual benefit.",
     "Fund Raising": "I want to secure funds from investors to expand, innovate, or support my business operations.",
@@ -134,7 +134,7 @@ def get_company_summary(profile_info, openai_api_key):
 def generate_comprehensive_summary(profile_info, business_priorities, company_summary, openai_api_key):
     """Generate comprehensive business analysis and recommendations"""
     prompt = f"""
-    Based on the following information, provide a comprehensive 800-word analysis:
+    Based on the following information, provide a comprehensive 2000-word analysis:
     
     Company Profile:
     {json.dumps(profile_info, indent=2)}
