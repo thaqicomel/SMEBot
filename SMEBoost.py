@@ -102,7 +102,7 @@ def generate_comprehensive_summary(profile_info, business_priorities, company_su
 def get_company_summary(profile_info, openai_api_key):
     """Generate comprehensive company summary"""
     prompt = f"""
-    Based on the following company profile, provide a comprehensive 1500-word summary of the business:
+    Based on the following company profile, provide a comprehensive 1500-word summary of the business in a paragraph.I dont want in points:
     
     Annual Revenue Range: {profile_info['revenue_range']}
     Staff Strength: {profile_info['staff_strength']}
@@ -121,7 +121,7 @@ def get_company_summary(profile_info, openai_api_key):
     """
     return get_openai_response(
         prompt,
-        "You are a business analyst providing comprehensive company summaries.",
+        "You are a business analyst providing comprehensive company summaries in a paragraph.",
         openai_api_key
     )
 
@@ -606,7 +606,7 @@ def generate_pdf(comprehensive_summary, profile_info, selected_areas, company_su
     # Executive Summary
     elements.append(Paragraph("Executive Summary", styles['title']))
     if company_summary:
-        elements.append(Paragraph(clean_text(company_summary) + "...", styles['content']))
+        elements.append(Paragraph(clean_text(company_summary), styles['content']))
     else:
         elements.append(Paragraph("No executive summary available.", styles['content']))
     elements.append(Spacer(1, 20))
