@@ -436,7 +436,7 @@ def create_front_page(styles, profile_info):
     # elements.append(Spacer(1, 40))
     
     # Date
-    current_date = datetime.datetime.now().strftime("%B %d, %Y")
+    current_date = datetime.datetime.now().strftime("%B %d, %Y %I:%M %p")
     elements.append(Paragraph(f"Generated on: {current_date}", styles['front_date']))
     
     elements.append(PageBreak())
