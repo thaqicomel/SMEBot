@@ -96,10 +96,16 @@ def generate_comprehensive_summary(profile_info, business_priorities, company_su
     1. Synthesized company summary and priorities 
     2. 5 specific reasons for needing an advisor/coach 
     3. Detailed advisor/coach solutions for key pain points
+        - must put in numbering for the points
     4. Specific KPIs for:
        - Short term (3 months)
        - Medium term (3-6 months)
        - Long term (6-12 months)
+        the KPI section must be like this:
+        Short Term (3 Months)
+        • Increase website traffic by 20% through SEO and social media marketing
+        -Subtopic no bullet
+        -answer with bullet
     """
     return get_openai_response(
         prompt,
