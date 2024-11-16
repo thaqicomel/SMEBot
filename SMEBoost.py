@@ -16,6 +16,11 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import PageTemplate, Frame
+from reportlab.lib.pagesizes import letter
+import re
 
 # Constants
 BUSINESS_OPTIONS = {
@@ -50,8 +55,8 @@ def business_priority(business_info, openai_api_key):
     """Get business priority suggestions"""
     return get_openai_response(
         f"User Information: {business_info}. Please expand the given points, Synthesize and organise the inputs, "
-        f"Explain with possible examples, Provide strategic implications and Maximum 180 words",
-        "You are a helpful assistant specialized in providing business priority suggestions.",
+        f"Explain with 3 possible examples, Provide strategic implications with supporting facts and examples and Maximum 250 words",
+        "You are a top business coach who specialized in providing guidance.Make the language simple and relatable.",
         openai_api_key
     )
 
@@ -62,10 +67,12 @@ def get_specific_suggestions(business_info, suggestion_type, openai_api_key):
 
 Provide a {suggestion_type} analysis with exactly these requirements (Maximum 200 words):
 
-1. List and describe the potential purposes and benefits
-2. Explain linkages with earlier responses
-3. Provide examples with specific facts and figures
-4. List required information and preparation steps
+1. Explain how to focus energy and resources on activities that directly support your stated priority - give 3 examples 
+2. How to develop a clear plan with measurable milestones to ensure consistent progress toward your goal. Highlight and explain the importance of structured goal-setting in the specific context. 
+3. Explain how to delegate tasks that do not align with your priority to maintain focus and efficiency - give examples om how to promote  prioritization and productivity.
+4. Explain how to Communicate your priorities clearly to your team to ensure alignment and collective action." Provide examples on how to emphasize the value of shared understanding and collaboration.
+5. Explain how to Regularly review your progress and adapt your approach to stay aligned with your desired outcomes." Give examples on how to Advocate for continuous evaluation and flexibility in this situation.
+
 
 Keep responses specific to their context:
 {business_info}"""
@@ -124,7 +131,6 @@ def get_company_summary(profile_info, openai_api_key):
         "You are a business analyst providing comprehensive company summaries in a paragraph.",
         openai_api_key
     )
-
 def initialize_session_state():
     """Initialize Streamlit session state variables"""
     if 'show_options' not in st.session_state:
@@ -135,7 +141,6 @@ def initialize_session_state():
         st.session_state.user_data = {
             'timestamp': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
-
 def render_header():
     """Render application header"""
     col1, col2 = st.columns([3, 1])
@@ -147,7 +152,6 @@ def render_header():
         logo_path = "finb.jpg"
         if os.path.exists(logo_path):
             st.image(logo_path, width=100)
-
 def render_business_priority_form():
     """Render business priority input form"""
     with st.form(key="business_priority_form"):
@@ -160,7 +164,6 @@ def render_business_priority_form():
         if submit_button and business_priorities:
             return business_priorities
     return None
-
 def render_business_options(business_priorities, openai_api_key):
     """Render business options selection"""
     # Generate business priority suggestions if not already present
@@ -197,7 +200,6 @@ def render_business_options(business_priorities, openai_api_key):
         if submit:
             return selected_options
     return None
-
 def render_business_profile_form():
     """Render business profile form"""
     st.write("### Business Profile")
@@ -242,231 +244,326 @@ def render_business_profile_form():
         if st.form_submit_button("Generate Analysis"):
             return profile_info
     return None
-def clean_text(text):
-    """Clean text by removing markdown formatting"""
-    if not text:
-        return ""
-    # Remove section markers
-    text = text.replace('###', '')
-    # Remove bullet points
-    text = text.replace('- ', '')
-    # Remove bold markers
-    text = text.replace('**', '')
-    # Remove extra whitespace
-    text = ' '.join(text.split())
-    # Clean up any remaining markdown artifacts
-    text = text.replace('_', ' ')
-    text = text.replace('`', '')
-    text = text.replace('*', '')
-    text = text.replace('##', '')
-    text = text.replace('....', '.')
-    text = text.replace('...', '.')
-    text = text.replace('..', '.')
-    return text.strip()
-
-def process_section(text):
-    """Process a section of text, handling both title and content"""
-    if ':' in text:
-        title, content = text.split(':', 1)
-        return clean_text(title), clean_text(content)
-    return None, clean_text(text)
 
 def create_custom_styles():
-    """Create custom styles for the PDF document"""
+    """Create custom styles for the PDF document using Helvetica font family"""
     styles = getSampleStyleSheet()
     
-    # Define all styles
+    # Define modern color scheme
+    custom_colors = {
+        'primary': colors.HexColor('#1a1a1a'),      # Main text
+        'secondary': colors.HexColor('#4A5568'),    # Secondary text
+        'accent': colors.HexColor('#2B6CB0'),       # Titles and headings
+        'subtle': colors.HexColor('#718096'),       # Subtle text
+        'background': colors.HexColor('#F7FAFC'),   # Background elements
+        'divider': colors.HexColor('#E2E8F0')       # Lines and dividers
+    }
+    
     custom_styles = {
         'front_title': ParagraphStyle(
             'FrontTitle',
             parent=styles['Title'],
-            fontSize=40,
-            spaceAfter=50,
-            textColor=colors.HexColor('#1a1a1a'),
+            fontName='Helvetica-Bold',
+            fontSize=36,
+            spaceAfter=40,
+            textColor=custom_colors['accent'],
             alignment=TA_LEFT,
-            leading=44,
-            fontName='Helvetica-Bold'
+            leading=44
         ),
         'front_subtitle': ParagraphStyle(
             'FrontSubtitle',
             parent=styles['Normal'],
-            fontSize=16,
-            textColor=colors.HexColor('#666666'),
+            fontName='Helvetica',
+            fontSize=18,
+            textColor=custom_colors['secondary'],
             alignment=TA_LEFT,
-            spaceBefore=100
-        ),
-        'front_date': ParagraphStyle(
-            'FrontDate',
-            parent=styles['Normal'],
-            fontSize=14,
-            textColor=colors.HexColor('#666666'),
-            alignment=TA_LEFT,
-            spaceBefore=10
-        ),
-        'toc_title': ParagraphStyle(
-            'TOCTitle',
-            parent=styles['Title'],
-            fontSize=24,
-            spaceAfter=30,
-            textColor=colors.HexColor('#1a1a1a'),
-            alignment=TA_LEFT,
-            leading=28,
-            fontName='Helvetica-Bold'
-        ),
-        'toc_entry': ParagraphStyle(
-            'TOCEntry',
-            parent=styles['Normal'],
-            fontSize=12,
-            leading=18,
-            textColor=colors.HexColor('#4d4d4d')
-        ),
-        'toc_entry_level2': ParagraphStyle(
-            'TOCEntryLevel2',
-            parent=styles['Normal'],
-            fontSize=11,
-            leading=16,
-            leftIndent=20,
-            textColor=colors.HexColor('#666666')
+            spaceBefore=100,
+            leading=22
         ),
         'title': ParagraphStyle(
             'CustomTitle',
             parent=styles['Title'],
+            fontName='Helvetica-Bold',
             fontSize=28,
             spaceAfter=30,
-            textColor=colors.HexColor('#1a1a1a'),
+            spaceBefore=20,
+            textColor=colors.HexColor('#2B6CB0'),
             alignment=TA_LEFT,
-            leading=32,
-            fontName='Helvetica-Bold'
+            leading=34
         ),
         'heading': ParagraphStyle(
             'CustomHeading',
             parent=styles['Heading1'],
-            fontSize=20,
+            fontName='Helvetica-Bold',
+            fontSize=22,
             textColor=colors.HexColor('#1a1a1a'),
             spaceBefore=25,
             spaceAfter=15,
             alignment=TA_LEFT,
-            leading=24,
-            fontName='Helvetica-Bold'
+            leading=28
         ),
         'subheading': ParagraphStyle(
             'CustomSubheading',
             parent=styles['Heading2'],
-            fontSize=16,
-            textColor=colors.HexColor('#333333'),
-            spaceBefore=15,
-            spaceAfter=10,
+            fontName='Helvetica-Bold',
+            fontSize=18,
+            textColor=custom_colors['secondary'],
+            spaceBefore=20,
+            spaceAfter=12,
             alignment=TA_LEFT,
-            leading=20,
-            fontName='Helvetica-Bold'  # Ensure subheadings are bold
-        ),
-        'numbered_section': ParagraphStyle(
-            'NumberedSection',
-            parent=styles['Heading2'],
-            fontSize=16,
-            textColor=colors.HexColor('#333333'),
-            spaceBefore=15,
-            spaceAfter=10,
-            alignment=TA_LEFT,
-            leading=20,
-            fontName='Helvetica-Bold'  # Make numbered sections bold
+            leading=24
         ),
         'content': ParagraphStyle(
             'CustomContent',
             parent=styles['Normal'],
+            fontName='Helvetica',
             fontSize=11,
-            leading=16,
-            textColor=colors.HexColor('#4d4d4d'),
+            leading=18,
+            textColor=custom_colors['primary'],
             alignment=TA_LEFT,
-            spaceBefore=6,
-            spaceAfter=6
+            spaceBefore=8,
+            spaceAfter=12,
+            bulletIndent=12,
+            firstLineIndent=0
         ),
         'bullet': ParagraphStyle(
             'BulletPoint',
             parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=11,
+            leading=18,
+            leftIndent=20,
+            bulletIndent=12,
+            spaceBefore=4,
+            spaceAfter=4,
+            textColor=custom_colors['primary']
+        ),
+        'table_header': ParagraphStyle(
+            'TableHeader',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=12,
+            textColor=custom_colors['accent'],
+            alignment=TA_LEFT,
+            leading=16
+        ),
+        'table_cell': ParagraphStyle(
+            'TableCell',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=11,
+            textColor=custom_colors['primary'],
+            alignment=TA_LEFT,
+            leading=16
+        ),
+        'caption': ParagraphStyle(
+            'Caption',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=9,
+            textColor=custom_colors['subtle'],
+            alignment=TA_LEFT,
+            leading=12
+        ),
+        'toc_title': ParagraphStyle(
+            'TOCTitle',
+            parent=styles['Title'],
+            fontName='Helvetica-Bold',
+            fontSize=24,
+            spaceAfter=30,
+            textColor=custom_colors['primary'],
+            alignment=TA_LEFT,
+            leading=28
+        ),
+        'toc_entry': ParagraphStyle(
+            'TOCEntry',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=12,
+            leading=18,
+            textColor=custom_colors['primary']
+        ),
+        'toc_entry_level2': ParagraphStyle(
+            'TOCEntryLevel2',
+            parent=styles['Normal'],
+            fontName='Helvetica',
             fontSize=11,
             leading=16,
             leftIndent=20,
-            bulletIndent=12,
-            spaceBefore=6,
-            spaceAfter=6,
-            textColor=colors.HexColor('#4d4d4d')
+            textColor=custom_colors['secondary']
+        ),
+        'front_date': ParagraphStyle(
+            'FrontDate',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=14,
+            textColor=custom_colors['subtle'],
+            alignment=TA_LEFT,
+            spaceBefore=10
         )
     }
     
     return custom_styles
-def create_front_page(styles, profile_info):
-    """Create the front page elements with fixed company logos"""
-    elements = []
-    
-    # Create a table for the logos
-    if os.path.exists("smeimge.jpg") and os.path.exists("finb.jpg"):
-        logo_left = Image("smeimge.jpg", width=2*inch, height=1*inch)
-        logo_right = Image("finb.jpg", width=2*inch, height=1*inch)
-        
-        logo_table = Table(
-            [[logo_left, logo_right]], 
-            colWidths=[4*inch, 2*inch],
-            style=TableStyle([
-                ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-                ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ])
-        )
-        elements.append(logo_table)
-    
-    elements.append(Spacer(1, 1.5*inch))
-    elements.append(Paragraph("Business Analysis Report for SME", styles['front_title']))
-    elements.append(Paragraph("Lite Version", styles['front_subtitle']))
 
-    
-    # Decorative line
-    # line = Table([['']], colWidths=[5*inch], rowHeights=[2])
-    # line.setStyle(TableStyle([
-    #     ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#1a1a1a')),
-    #     ('LINEABOVE', (0, 0), (-1, 0), 2, colors.HexColor('#1a1a1a')),
-    # ]))
-    # elements.append(line)
-    
-    # Company info
-    # elements.append(Spacer(1, 30))
-    # elements.append(Paragraph(f"Industry: {clean_text(profile_info.get('industry', 'N/A'))}", styles['front_subtitle']))
-    # elements.append(Spacer(1, 10))
-    # elements.append(Paragraph(f"Revenue Range: {clean_text(profile_info.get('revenue_range', 'N/A'))}", styles['front_subtitle']))
-    # elements.append(Spacer(1, 40))
-    
-    # Date
-    current_date = datetime.datetime.now().strftime("%B %d, %Y %I:%M %p")
-    elements.append(Paragraph(f"Generated on: {current_date}", styles['front_date']))
-    
-    elements.append(PageBreak())
-    return elements
+def process_section_content(content, styles, elements):
+    """Process section content and add appropriate styling"""
+    main_sections = {
+        "Company Overview": ["company overview", "business overview"],
+        "Market Analysis": ["market analysis", "industry analysis"],
+        "Strategic Recommendations": ["strategic recommendations", "recommendations"],
+        "Financial Implications": ["financial implications", "financial impact"],
+        "Implementation Timeline": ["implementation timeline", "timeline"],
+        "Risk Assessment": ["risk assessment", "risks"],
+        "Next Steps": ["next steps", "action items"]
+    }
+
+    # Clean up the text
+    clean_text_content = content.replace('#', '').replace('*', '')
+    paragraphs = [p.strip() for p in clean_text_content.split('\n') if p.strip()]
+
+    for paragraph in paragraphs:
+        clean_paragraph = paragraph.strip()
+        lower_paragraph = clean_paragraph.lower()
+
+        # Check if this is a main section
+        is_main_section = False
+        for section, variations in main_sections.items():
+            if any(var in lower_paragraph for var in variations):
+                elements.append(Spacer(1, 20))
+                elements.append(Paragraph(section, styles['subheading']))
+                elements.append(Spacer(1, 10))
+                is_main_section = True
+                break
+
+        if not is_main_section:
+            # Handle bullet points
+            if '•' in clean_paragraph or clean_paragraph.startswith('-'):
+                points = clean_paragraph.replace('-', '•').split('•')
+                for point in points:
+                    if point.strip():
+                        elements.append(Paragraph(f"• {clean_text(point)}", styles['bullet']))
+            # Regular paragraphs
+            else:
+                if clean_paragraph:
+                    elements.append(Paragraph(clean_text(clean_paragraph), styles['content']))
+                    elements.append(Spacer(1, 12))
+
+def generate_pdf(comprehensive_summary, profile_info, selected_areas, company_summary):
+    """Generate the complete PDF report with enhanced styling and layout"""
+    buffer = io.BytesIO()
+
+    # Validate inputs before proceeding
+    if not comprehensive_summary or not profile_info or not selected_areas or not company_summary:
+        st.error("Missing required content for PDF generation")
+        return create_error_pdf()
+
+    try:
+        # Create document with adjusted margins
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=1.25 * inch,
+            leftMargin=1.25 * inch,
+            topMargin=1.5 * inch,
+            bottomMargin=1 * inch
+        )
+
+        # Create styles
+        styles = create_custom_styles()
+
+        # Build elements list
+        elements = []
+
+        # Front page
+        if profile_info:
+            elements.extend(create_front_page(styles, profile_info))
+        else:
+            elements.append(Paragraph("Profile Information Missing", styles['error']))
+
+        # Table of Contents
+        content_sections = {
+            'business_areas': selected_areas
+        }
+        create_dynamic_toc(elements, styles, content_sections)
+
+        # Executive Summary
+        elements.append(Paragraph("Executive Summary", styles['title']))
+        if company_summary:
+            elements.extend(create_executive_summary_section(company_summary, styles))
+        else:
+            elements.append(Paragraph("Company Summary Missing", styles['error']))
+        elements.append(PageBreak())
+
+        # Selected Business Areas
+        if selected_areas:
+            elements.append(Paragraph("Selected Business Areas", styles['title']))
+            for area in selected_areas:
+                elements.append(Paragraph(area, styles['heading']))
+                area_key = f"{area.lower().replace(' ', '_')}_analysis"
+
+                # Add area analysis if available
+                if area_key in st.session_state.user_data:
+                    elements.extend(create_business_area_section(st.session_state.user_data[area_key], styles))
+                else:
+                    elements.append(Paragraph(f"Analysis for {area} is missing.", styles['error']))
+                elements.append(PageBreak())
+        else:
+            elements.append(Paragraph("No business areas selected.", styles['error']))
+
+        # Comprehensive Analysis
+        if comprehensive_summary:
+            elements.append(Paragraph("Comprehensive Analysis", styles['title']))
+            content_elements = create_comprehensive_analysis_section(comprehensive_summary, styles)
+            if content_elements:
+                elements.extend(content_elements)
+            else:
+                elements.append(Paragraph("Comprehensive Analysis content is incomplete.", styles['error']))
+        else:
+            elements.append(Paragraph("Comprehensive Analysis Missing.", styles['error']))
+
+        # Build the PDF
+        doc.build(elements)
+        buffer.seek(0)
+        return buffer
+
+    except Exception as e:
+        st.error(f"Error generating PDF: {str(e)}")
+        return create_error_pdf()
 
 def create_dynamic_toc(elements, styles, content_sections):
-    """Create dynamic table of contents"""
+    """Create dynamic table of contents with enhanced styling"""
+    elements.append(Table([['']], colWidths=[7*inch], rowHeights=[2],
+        style=TableStyle([
+            ('LINEABOVE', (0, 0), (-1, 0), 1, colors.HexColor('#2B6CB0')),
+            ('TOPPADDING', (0, 0), (-1, -1), 20),
+        ])
+    ))
+    
     elements.append(Paragraph("Table of Contents", styles['toc_title']))
-    elements.append(Spacer(1, 20))
+    elements.append(Spacer(1, 30))
     
-    current_page = 2  # Start from page 2 (after front page)
+    current_page = 2  # Start after front page
     toc_entries = []
-    e_page = 3
-    # Build TOC entries dynamically
-    toc_entries.append(("Executive Summary", e_page))
-    current_page += 3
     
+    # Executive Summary (always starts on page 3)
+    toc_entries.append(("Executive Summary", 3))
+    current_page = 4  # Next section starts after executive summary
+    
+    # Business Areas (each on new page)
     if content_sections.get('business_areas'):
         toc_entries.append(("Selected Business Areas", current_page))
         current_page += 1
         for area in content_sections['business_areas']:
             toc_entries.append((f"    {area}", current_page))
-            current_page += 1
+            current_page += 2  # Each area gets its own page + spacing
     
+    # Comprehensive Analysis
     toc_entries.append(("Comprehensive Analysis", current_page))
     
     # Generate TOC entries with dot leaders
     for title, page in toc_entries:
         if title.startswith("    "):
-            # Level 2 entry (indented)
+            # Indent sub-entries
             title = title.strip()
             elements.append(
                 Paragraph(
@@ -475,219 +572,455 @@ def create_dynamic_toc(elements, styles, content_sections):
                 )
             )
         else:
-            # Level 1 entry
             elements.append(
                 Paragraph(
                     f"{title} {'.' * (60 - len(title))} {page}",
                     styles['toc_entry']
                 )
             )
+        elements.append(Spacer(1, 12))
+    
+    elements.append(Table([['']], colWidths=[7*inch], rowHeights=[2],
+        style=TableStyle([
+            ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#2B6CB0')),
+            ('TOPPADDING', (0, 0), (-1, -1), 20),
+        ])
+    ))
     
     elements.append(PageBreak())
     return current_page
 
-# def create_company_profile_table(styles, profile_info):
-#     """Create a formatted table with company profile data"""
-#     elements = []
+def create_executive_summary_section(content, styles):
+    """Create executive summary section with enhanced formatting"""
+    elements = []
+    paragraphs = content.split('\n\n')
     
-#     elements.append(Paragraph("Company Profile", styles['title']))
-    
-#     # Define table data
-#     data = [['Field', 'Value']]  # Header row
-    
-#     field_mapping = {
-#         'revenue_range': 'Revenue Range',
-#         'staff_strength': 'Staff Strength',
-#         'customer_base': 'Customer Base',
-#         'business_model': 'Business Model',
-#         'industry': 'Industry',
-#         'products_services': 'Products/Services',
-#         'differentiation': 'Competitive Differentiation'
-#     }
-    
-#     # Add profile info to table data in specified order
-#     for key, display_name in field_mapping.items():
-#         if key in profile_info:
-#             data.append([display_name, str(profile_info[key]).strip()])
-    
-#     # Create table style
-#     table_style = TableStyle([
-#         # Header style
-#         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a1a1a')),
-#         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-#         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-#         ('FONTSIZE', (0, 0), (-1, 0), 11),
-#         ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+    for i, paragraph in enumerate(paragraphs):
+        if i == 0:
+            # First paragraph with indentation
+            para_style = ParagraphStyle(
+                'IndentedContent',
+                parent=styles['content'],
+                firstLineIndent=36
+            )
+        else:
+            para_style = styles['content']
         
-#         # Cell style
-#         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-#         ('FONTSIZE', (0, 1), (-1, -1), 10),
-#         ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-#         ('ALIGN', (1, 0), (-1, -1), 'LEFT'),
-        
-#         # Grid and colors
-#         ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e6e6e6')),
-#         ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-#         ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
-        
-#         # Padding
-#         ('TOPPADDING', (0, 0), (-1, -1), 6),
-#         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-#         ('LEFTPADDING', (0, 0), (-1, -1), 12),
-#         ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-#     ])
+        elements.append(Paragraph(clean_text(paragraph), para_style))
+        elements.append(Spacer(1, 12))
     
-#     table = Table(data, colWidths=[2.5*inch, 3.5*inch])
-#     table.setStyle(table_style)
-    
-#     elements.append(table)
-#     elements.append(Spacer(1, 20))
-#     elements.append(PageBreak())
-    
-#     return elements
+    return elements
 
-def create_header_footer(canvas, doc):
-    """Add header and footer to each page with company logo"""
+def create_page_background(canvas, doc):
+    """Create background for each page"""
+    canvas.saveState()
+    canvas.setFillColor(colors.HexColor('#F7FAFC'))
+    canvas.rect(0, 0, letter[0], letter[1], fill=True)
+    canvas.restoreState()
+
+def create_enhanced_header_footer(canvas, doc):
+    """Create enhanced header and footer with logo and page numbers"""
     canvas.saveState()
     
     if doc.page > 1:
-        # Header with fixed logo
+        # Header
         if os.path.exists("finb.jpg"):
-            canvas.drawImage("finb.jpg", 
-                           letter[0] - 1.5*inch, 
-                           letter[1] - 0.75*inch, 
-                           width=1.3*inch, 
-                           height=0.8*inch, 
-                           preserveAspectRatio=True)
+            canvas.drawImage(
+                "finb.jpg",
+                doc.width + doc.rightMargin - 1.5*inch,
+                doc.height + doc.topMargin - 0.6*inch,
+                width=1.2*inch,
+                height=0.5*inch,
+                preserveAspectRatio=True
+            )
         
-        canvas.setStrokeColor(colors.HexColor('#e6e6e6'))
-        # canvas.line(inch, letter[1] - 0.5*inch, letter[0] - inch, letter[1] - 0.5*inch)
+        canvas.setFont('Helvetica-Bold', 10)
+        canvas.setFillColor(colors.HexColor('#2B6CB0'))
+        canvas.drawString(
+            doc.leftMargin,
+            doc.height + doc.topMargin - 0.4*inch,
+            "Business Analysis Report"
+        )
+        
+        canvas.setStrokeColor(colors.HexColor('#E2E8F0'))
+        canvas.setLineWidth(0.5)
+        canvas.line(
+            doc.leftMargin,
+            doc.height + doc.topMargin - 0.7*inch,
+            doc.width + doc.rightMargin,
+            doc.height + doc.topMargin - 0.7*inch
+        )
         
         # Footer
-        canvas.setFillColor(colors.HexColor('#666666'))
         canvas.setFont('Helvetica', 9)
+        canvas.setFillColor(colors.HexColor('#4A5568'))
         
-        # Page number
         page_num = f"Page {doc.page}"
-        canvas.drawString(letter[0] - 2*inch, 0.5*inch, page_num)
+        canvas.drawRightString(
+            doc.width + doc.rightMargin,
+            doc.bottomMargin - 0.25*inch,
+            page_num
+        )
         
-        # Company name
-        canvas.drawString(inch, 0.5*inch, "Business Analysis Report")
+        current_date = datetime.datetime.now().strftime("%B %d, %Y")
+        canvas.drawString(
+            doc.leftMargin,
+            doc.bottomMargin - 0.25*inch,
+            current_date
+        )
         
-        # Footer line
-        canvas.line(inch, 0.75*inch, letter[0] - inch, 0.75*inch)
+        canvas.setStrokeColor(colors.HexColor('#E2E8F0'))
+        canvas.line(
+            doc.leftMargin,
+            doc.bottomMargin - 0.125*inch,
+            doc.width + doc.rightMargin,
+            doc.bottomMargin - 0.125*inch
+        )
     
     canvas.restoreState()
-def generate_pdf(comprehensive_summary, profile_info, selected_areas, company_summary):
-    """Generate the complete PDF report"""
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        rightMargin=1.25*inch,
-        leftMargin=1.25*inch,
-        topMargin=1.25*inch,
-        bottomMargin=inch
-    )
-    
-    styles = create_custom_styles()
+
+def create_business_area_section(content, styles):
+    """Create beautifully formatted business area section"""
     elements = []
     
-    # Front page with fixed logos
-    elements.extend(create_front_page(styles, profile_info))
+    lines = content.split('\n')
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        if line.startswith(('•', '-')):
+            text = line.lstrip('•- ')
+            elements.append(Paragraph(f"• {clean_text(text)}", styles['bullet']))
+        elif line.startswith(('#', '##')):
+            text = line.lstrip('#').strip()
+            elements.append(Paragraph(clean_text(text), styles['subheading']))
+            elements.append(Spacer(1, 6))
+        else:
+            elements.append(Paragraph(clean_text(line), styles['content']))
+            elements.append(Spacer(1, 8))
     
-    # Table of Contents
-    content_sections = {
-        'business_areas': selected_areas,
-        'analysis_sections': ["Comprehensive Analysis"]
+    return elements
+
+def create_section_styles(base_styles):
+    """Create enhanced styles for comprehensive analysis"""
+    return {
+        'h1': ParagraphStyle(
+            'Heading1',
+            parent=base_styles['heading'],
+            fontSize=24,
+            spaceBefore=20,
+            spaceAfter=15,
+            textColor=colors.HexColor('#1a365d'),
+            borderPadding=(10, 0, 10, 0),
+            leading=28
+        ),
+        'h2': ParagraphStyle(
+            'Heading2',
+            parent=base_styles['subheading'],
+            fontSize=18,
+            spaceBefore=15,
+            spaceAfter=10,
+            textColor=colors.HexColor('#2b6cb0'),
+            leading=22
+        ),
+        'body': ParagraphStyle(
+            'Body',
+            parent=base_styles['content'],
+            fontSize=11,
+            leading=16,
+            alignment=TA_JUSTIFY,
+            firstLineIndent=20
+        ),
+        'highlight': ParagraphStyle(
+            'Highlight',
+            parent=base_styles['content'],
+            fontSize=12,
+            textColor=colors.HexColor('#2b6cb0'),
+            backColor=colors.HexColor('#f7fafc'),
+            borderPadding=10,
+            leading=18
+        )
     }
-    create_dynamic_toc(elements, styles, content_sections)
+
+def create_comprehensive_analysis_section(content, styles):
+    """Create structured comprehensive analysis section with improved formatting"""
+    elements = []
+    custom_styles = create_section_styles(styles)
     
-    # Executive Summary
-    elements.append(Paragraph("Executive Summary", styles['title']))
-    if company_summary:
-        elements.append(Paragraph(clean_text(company_summary), styles['content']))
-    else:
-        elements.append(Paragraph("No executive summary available.", styles['content']))
-    elements.append(Spacer(1, 20))
+    # Parse content into sections
+    sections = parse_content_sections(content)
+    
+    # Company Overview Section
+    elements.extend([
+        create_section_header("Company Overview and Priorities", custom_styles['h1']),
+        create_highlight_box(sections['summary'][0] if sections['summary'] else "", custom_styles)
+    ])
+    
+    # for para in sections['summary'][1:]:
+    #     elements.append(Paragraph(clean_text(para), custom_styles['body']))
+    
     elements.append(PageBreak())
     
-    # Company Profile
-    #elements.extend(create_company_profile_table(styles, profile_info))
+    # Key Reasons Section
+    elements.append(create_section_header("Key Reasons for Advisory Support", custom_styles['h1']))
+    elements.append(create_reasons_table(sections['reasons'], custom_styles))
+    elements.append(PageBreak())
     
-    # Selected Business Areas
-    elements.append(Paragraph("Selected Business Areas", styles['title']))
-    for area in selected_areas:
-        elements.append(Paragraph(clean_text(area), styles['heading']))
-        elements.append(Paragraph(clean_text(BUSINESS_OPTIONS[area]), styles['content']))
-        
-        # Add specific analysis
-        area_key = f"{area.lower().replace(' ', '_')}_analysis"
-        if area_key in st.session_state.user_data:
-            elements.append(Paragraph("Analysis", styles['subheading']))
-            analysis_text = clean_text(st.session_state.user_data[area_key])
-            for paragraph in analysis_text.split('\n'):
-                if paragraph.strip():
-                    elements.append(Paragraph(paragraph.strip(), styles['content']))
-            elements.append(PageBreak())
+    # Solutions Section
+    # elements.append(create_section_header("Strategic Solutions and Recommendations", custom_styles['h1']))
+    # for category, points in sections['solutions'].items():
+    #     elements.extend([
+    #         Paragraph(clean_text(category), custom_styles['h2']),
+    #         create_solution_box(points, custom_styles)
+    #     ])
     
-    # Comprehensive Analysis
-    elements.append(Paragraph("Comprehensive Analysis", styles['title']))
-    elements.append(Spacer(1, 20))
+    # elements.append(PageBreak())
     
-    # Define main sections and their variations
-    main_sections = {
-        "Synthesized Company Summary and Priorities": ["synthesized company summary", "company summary and priorities"],
-        "5 Reasons for Needing an Advisor/Coach": ["reasons for needing", "specific reasons", "five specific reasons"],
-        "Detailed Advisor/Coach Solutions": ["detailed advisor", "coach solutions", "advisor/coach solutions"],
-        "Specific KPIs for Tracking Progress": ["specific kpis", "kpis for tracking", "tracking progress"]
+    # KPIs Section
+    elements.append(create_section_header("Performance Metrics and Targets", custom_styles['h1']))
+    kpi_periods = [
+        ('short', 'Short Term (3 Months)'),
+        ('medium', 'Medium Term (3-6 Months)'),
+        ('long', 'Long Term (6-12 Months)')
+    ]
+    
+    for period_key, period_title in kpi_periods:
+        if sections['kpis'][period_key]:
+            elements.extend([
+                Paragraph(period_title, custom_styles['h2']),
+                create_kpi_table(sections['kpis'][period_key], custom_styles)
+            ])
+    
+    return elements
+
+def parse_content_sections(content):
+    """Parse comprehensive analysis content into structured sections"""
+    sections = {
+        "summary": [],
+        "reasons": [],
+        "solutions": {},
+        "kpis": {
+            "short": [],
+            "medium": [],
+            "long": []
+        }
     }
     
-    if comprehensive_summary:
-        # Clean up the text
-        clean_text_content = comprehensive_summary.replace('#', '').replace('*', '')
-        paragraphs = [p.strip() for p in clean_text_content.split('\n') if p.strip()]
+    current_section = None
+    current_subsection = None
+    solution_category = None
+    
+    for line in content.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+            
+        lower_line = line.lower()
         
-        for paragraph in paragraphs:
-            clean_paragraph = paragraph.strip()
-            lower_paragraph = clean_paragraph.lower()
-            
-            # Check if this is a main section (or variation)
-            is_main_section = False
-            for section, variations in main_sections.items():
-                if any(var in lower_paragraph for var in variations):
-                    elements.append(Spacer(1, 20))
-                    elements.append(Paragraph(section, styles['subheading']))
-                    elements.append(Spacer(1, 10))
-                    is_main_section = True
-                    break
-            
-            if not is_main_section:
-                # Check if it's a timing-related header
-                if any(term in clean_paragraph for term in ['Short Term', 'Medium Term', 'Long Term']):
-                    elements.append(Paragraph(clean_paragraph, styles['heading']))
-                # Handle bullet points
-                elif '•' in clean_paragraph or clean_paragraph.startswith('-'):
-                    points = clean_paragraph.replace('-', '•').split('•')
-                    for point in points:
-                        if point.strip():
-                            elements.append(Paragraph(f"• {clean_text(point)}", styles['bullet']))
-                # Regular paragraphs
-                else:
-                    if clean_paragraph:
-                        elements.append(Paragraph(clean_text(clean_paragraph), styles['content']))
-                        elements.append(Spacer(1, 12))
-    else:
-        elements.append(Paragraph("No comprehensive analysis available.", styles['content']))
+        # Identify sections
+        if any(x in lower_line for x in ["synthesized company summary", "company summary and priorities"]):
+            current_section = "summary"
+            continue
+        elif "reasons for needing" in lower_line or "5 reasons" in lower_line:
+            current_section = "reasons"
+            continue
+        elif "detailed advisor/coach solutions" in lower_line or "coach solutions" in lower_line:
+            current_section = "solutions"
+            continue
+        elif "short term" in lower_line and "month" in lower_line or "Short-term" in lower_line:
+            current_section = "kpis"
+            current_subsection = "short"
+            continue
+        elif "medium term" in lower_line and "month" in lower_line or "Medium-term" in lower_line:
+            current_section = "kpis"
+            current_subsection = "medium"
+            continue
+        elif "long term" in lower_line and "month" in lower_line or "Long-term" in lower_line:
+            current_section = "kpis"
+            current_subsection = "long"
+            continue
+        
+        # Process content based on section
+        if current_section == "summary":
+            sections["summary"].append(line)
+        elif current_section == "reasons":
+            if any(char.isdigit() for char in line[:2]):
+                cleaned_line = re.sub(r'^\d+\.?\s*', '', line)
+                sections["reasons"].append(cleaned_line)
+        elif current_section == "solutions":
+            if not line.startswith(('•', '-', '*')) and len(line) < 50:
+                solution_category = line
+                if solution_category not in sections["solutions"]:
+                    sections["solutions"][solution_category] = []
+            elif solution_category and line.startswith(('•', '-', '*')):
+                sections["solutions"][solution_category].append(line.lstrip('•- '))
+        elif current_section == "kpis" and current_subsection:
+            if line.startswith(('•', '-', '*')):
+                sections["kpis"][current_subsection].append(line.lstrip('•- '))
+    
+    return sections
 
-    # Build the PDF with header/footer
-    doc.build(
-        elements,
-        onFirstPage=create_header_footer,
-        onLaterPages=create_header_footer
+def create_section_header(title, style):
+    """Create formatted section header with decorative elements"""
+    return Table(
+        [[Paragraph(title, style)]],
+        colWidths=[7*inch],
+        style=TableStyle([
+            ('LINEABOVE', (0, 0), (-1, 0), 2, colors.HexColor('#2b6cb0')),
+            ('LINEBELOW', (0, 0), (-1, 0), 0.5, colors.HexColor('#e2e8f0')),
+            ('TOPPADDING', (0, 0), (-1, 0), 15),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 15),
+        ])
     )
-    buffer.seek(0)
-    return buffer
+
+def create_highlight_box(text, styles):
+    """Create highlighted box for key content"""
+    return Table(
+        [[Paragraph(clean_text(text), styles['highlight'])]],
+        colWidths=[7*inch],
+        style=TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f7fafc')),
+            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#e2e8f0')),
+            ('TOPPADDING', (0, 0), (-1, -1), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('LEFTPADDING', (0, 0), (-1, -1), 15),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 15),
+            ('ROUNDEDCORNERS', (0, 0), (-1, -1), 8),
+        ])
+    )
+
+def create_kpi_table(kpis, styles):
+    """Create formatted table for KPIs"""
+    if not kpis:
+        return Spacer(1, 10)
+        
+    data = []
+    for kpi in kpis:
+        clean_kpi = clean_text(kpi)
+        if clean_kpi:
+            data.append([Paragraph(f"• {clean_kpi}", styles['body'])])
+    
+    if not data:
+        return Spacer(1, 10)
+    
+    return Table(
+        data,
+        colWidths=[6.5*inch],
+        style=TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 20),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 15),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ])
+    )
+
+def create_reasons_table(reasons, styles):
+    """Create formatted table for reasons section"""
+    if not reasons:
+        return Spacer(1, 10)
+        
+    data = []
+    for i, reason in enumerate(reasons[:5]):
+        clean_reason = clean_text(reason)
+        if clean_reason:
+            data.append([Paragraph(f"{i+1}. {clean_reason}", styles['body'])])
+    
+    if not data:
+        return Spacer(1, 10)
+    
+    return Table(
+        data,
+        colWidths=[7*inch],
+        style=TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#ffffff')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ('LEFTPADDING', (0, 0), (-1, -1), 15),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 15),
+        ])
+    )
+
+def create_solution_box(points, styles):
+    """Create formatted box for solution points"""
+    if not points:
+        return Spacer(1, 10)
+        
+    data = []
+    for point in points:
+        clean_point = clean_text(point)
+        if clean_point:
+            data.append([Paragraph(f"• {clean_point}", styles['body'])])
+    
+    if not data:
+        return Spacer(1, 10)
+    
+    return Table(
+        data,
+        colWidths=[6.5*inch],
+        style=TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 20),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 15),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ])
+    )
+
+def clean_text(text):
+    """Clean text by removing markdown formatting"""
+    if not text:
+        return ""
+    text = text.replace('###', '')
+    text = text.replace('- ', '')
+    text = text.replace('**', '')
+    text = ' '.join(text.split())
+    text = text.replace('_', ' ')
+    text = text.replace('`', '')
+    text = text.replace('*', '')
+    text = text.replace('##', '')
+    text = text.replace('....', '.')
+    text = text.replace('...', '.')
+    text = text.replace('..', '.')
+    return text.strip()
+def create_front_page(styles, profile_info):
+    """Create front page with MyFinB logo placement"""
+    elements = []
+    
+    # Create table for logo placement
+    if os.path.exists("smeimge.jpg") and os.path.exists("finb.jpg"):
+        logo_table = Table(
+            [[
+                Image("smeimge.jpg", width=2*inch, height=0.5*inch),
+                '',  # Empty cell for spacing
+                Image("finb.jpg", width=1.5*inch, height=0.5*inch)
+            ]], 
+            colWidths=[2.5*inch, 3*inch, 2*inch],
+            style=TableStyle([
+                ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+                ('ALIGN', (-1, 0), (-1, 0), 'RIGHT'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ])
+        )
+        elements.append(logo_table)
+    
+    elements.extend([
+        Spacer(1, 1.5*inch),
+        Paragraph("Business Analysis Report for SME", styles['front_title']),
+        Paragraph("Lite Version", styles['front_subtitle']),
+        Paragraph(
+            f"Generated on: {datetime.datetime.now().strftime('%B %d, %Y %I:%M %p')}", 
+            styles['front_date']
+        ),
+        PageBreak()
+    ])
+    
+    return elements
+
 def create_error_pdf():
     """Create a simple PDF with error message if generation fails"""
     buffer = io.BytesIO()
@@ -740,18 +1073,6 @@ def create_error_pdf():
     buffer.seek(0)
     return buffer
 
-# Helper function to wrap PDF generation with error handling
-def generate_business_analysis_pdf(comprehensive_summary, profile_info, selected_areas, company_summary):
-    """
-    Wrapper function to handle PDF generation with error handling
-    """
-    try:
-        return generate_pdf(comprehensive_summary, profile_info, selected_areas, company_summary)
-    except Exception as e:
-        print(f"Error generating PDF: {str(e)}")
-        return create_error_pdf()
-
-# Function to validate PDF inputs
 def validate_pdf_inputs(profile_info, selected_areas, company_summary, comprehensive_summary):
     """
     Validate all required inputs for PDF generation
@@ -776,7 +1097,16 @@ def validate_pdf_inputs(profile_info, selected_areas, company_summary, comprehen
     
     return True, ""
 
-# Main function to generate PDF report
+def generate_business_analysis_pdf(comprehensive_summary, profile_info, selected_areas, company_summary):
+    """
+    Wrapper function to handle PDF generation with error handling
+    """
+    try:
+        return generate_pdf(comprehensive_summary, profile_info, selected_areas, company_summary)
+    except Exception as e:
+        print(f"Error generating PDF: {str(e)}")
+        return create_error_pdf()
+
 def create_business_analysis_report(profile_info, selected_areas, company_summary, comprehensive_summary):
     """
     Main function to create the business analysis PDF report
@@ -804,7 +1134,6 @@ def create_business_analysis_report(profile_info, selected_areas, company_summar
         st.error(f"Error generating report: {str(e)}")
         return create_error_pdf()
 
-# Example usage in Streamlit app
 def offer_pdf_download(pdf_buffer):
     """Helper function to offer PDF download in Streamlit"""
     st.download_button(
@@ -814,6 +1143,60 @@ def offer_pdf_download(pdf_buffer):
         mime="application/pdf",
         help="Click to download your complete business analysis report as PDF"
     )
+
+def process_section(text):
+    """Process a section of text, handling both title and content"""
+    if ':' in text:
+        title, content = text.split(':', 1)
+        return clean_text(title), clean_text(content)
+    return None, clean_text(text)
+
+def format_section(section_title, content, styles):
+    """Format a section of the comprehensive analysis"""
+    elements = []
+    
+    # Add section header
+    elements.append(Spacer(1, 20))
+    elements.append(Paragraph(section_title, styles['subheading']))
+    elements.append(Spacer(1, 10))
+    
+    # Process content
+    for line in content:
+        if line.startswith(('•', '-')):
+            # Bullet points
+            text = line.lstrip('•- ')
+            elements.append(Paragraph(f"• {clean_text(text)}", styles['bullet']))
+        else:
+            # Regular paragraphs
+            elements.append(Paragraph(clean_text(line), styles['content']))
+    
+    return elements
+
+def create_header_footer(canvas, doc):
+    """Add header and footer to each page with company logo"""
+    canvas.saveState()
+    
+    if doc.page > 1:
+        # Header with logo
+        if os.path.exists("finb.jpg"):
+            canvas.drawImage("finb.jpg", 
+                           letter[0] - 1.5*inch, 
+                           letter[1] - 0.75*inch, 
+                           width=1.3*inch, 
+                           height=0.8*inch, 
+                           preserveAspectRatio=True)
+        
+        canvas.setStrokeColor(colors.HexColor('#e6e6e6'))
+        
+        # Footer
+        canvas.setFillColor(colors.HexColor('#666666'))
+        canvas.setFont('Helvetica', 9)
+        page_num = f"Page {doc.page}"
+        canvas.drawString(letter[0] - 2*inch, 0.5*inch, page_num)
+        canvas.drawString(inch, 0.5*inch, "Business Analysis Report")
+        canvas.line(inch, 0.75*inch, letter[0] - inch, 0.75*inch)
+    
+    canvas.restoreState()
 def main():
     """Main application function"""
     initialize_session_state()
@@ -878,8 +1261,8 @@ def main():
                 
                 # Display analyses
                 # with st.expander("Company Profile Analysis", expanded=True):
-                #     st.markdown("### Company Summary")
-                #     st.write(company_summary)
+                #      st.markdown("### Company Summary")
+                #      st.write(company_summary)
                     
                 #     st.markdown("### Detailed Profile Information")
                 #     for key, value in profile_info.items():
@@ -887,8 +1270,8 @@ def main():
                 #         st.write(value)
                 
                 with st.expander("Comprehensive Analysis and Advisory Recommendations", expanded=True):
-                    st.markdown("### Complete Business Analysis")
-                    st.write(comprehensive_summary)
+                     st.markdown("### Complete Business Analysis")
+                     st.write(comprehensive_summary)
                 
                 # Generate and offer PDF download
                 pdf_buffer = generate_pdf(comprehensive_summary,profile_info,st.session_state.user_data['selected_areas'],company_summary)
