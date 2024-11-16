@@ -105,7 +105,7 @@ def generate_comprehensive_summary(profile_info, business_priorities, company_su
         Short Term (3 Months)
         • Increase website traffic by 20% through SEO and social media marketing
         -Subtopic no bullet
-        -answer with bullet
+        -answer with bullet 
     """
     return get_openai_response(
         prompt,
@@ -252,7 +252,7 @@ def render_business_profile_form():
     return None
 
 def create_custom_styles():
-    """Create custom styles for the PDF document using Helvetica font family"""
+    """Create enhanced custom styles for the PDF document"""
     styles = getSampleStyleSheet()
     
     # Define modern color scheme
@@ -262,7 +262,8 @@ def create_custom_styles():
         'accent': colors.HexColor('#2B6CB0'),       # Titles and headings
         'subtle': colors.HexColor('#718096'),       # Subtle text
         'background': colors.HexColor('#F7FAFC'),   # Background elements
-        'divider': colors.HexColor('#E2E8F0')       # Lines and dividers
+        'divider': colors.HexColor('#E2E8F0'),      # Lines and dividers
+        'warning': colors.HexColor('#dc2626')       # Warning/confidential text
     }
     
     custom_styles = {
@@ -276,15 +277,71 @@ def create_custom_styles():
             alignment=TA_LEFT,
             leading=44
         ),
-        'front_subtitle': ParagraphStyle(
+        'front_subtitle': ParagraphStyle(  # Added missing style
             'FrontSubtitle',
             parent=styles['Normal'],
             fontName='Helvetica',
             fontSize=18,
             textColor=custom_colors['secondary'],
             alignment=TA_LEFT,
-            spaceBefore=100,
+            spaceBefore=10,
+            spaceAfter=30,
             leading=22
+        ),
+        'section_header': ParagraphStyle(  # Added missing style
+            'SectionHeader',
+            parent=styles['Heading1'],
+            fontName='Helvetica-Bold',
+            fontSize=16,
+            textColor=custom_colors['accent'],
+            spaceBefore=15,
+            spaceAfter=10,
+            leading=20
+        ),
+        'profile_header': ParagraphStyle(
+            'ProfileHeader',
+            parent=styles['Heading1'],
+            fontName='Helvetica-Bold',
+            fontSize=14,
+            textColor=custom_colors['accent'],
+            spaceBefore=12,
+            spaceAfter=12
+        ),
+        'profile_content': ParagraphStyle(
+            'ProfileContent',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=11,
+            textColor=custom_colors['primary'],
+            spaceBefore=6,
+            spaceAfter=6
+        ),
+        'priorities_content': ParagraphStyle(
+            'PrioritiesContent',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=11,
+            textColor=custom_colors['primary'],
+            spaceBefore=6,
+            spaceAfter=6,
+            alignment=TA_JUSTIFY
+        ),
+        'metadata': ParagraphStyle(
+            'Metadata',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=10,
+            textColor=custom_colors['subtle'],
+            alignment=TA_CENTER
+        ),
+        'confidential': ParagraphStyle(
+            'Confidential',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=12,
+            textColor=custom_colors['warning'],
+            alignment=TA_CENTER,
+            spaceBefore=12
         ),
         'title': ParagraphStyle(
             'CustomTitle',
@@ -293,7 +350,7 @@ def create_custom_styles():
             fontSize=28,
             spaceAfter=30,
             spaceBefore=20,
-            textColor=colors.HexColor('#2B6CB0'),
+            textColor=custom_colors['accent'],
             alignment=TA_LEFT,
             leading=34
         ),
@@ -302,7 +359,7 @@ def create_custom_styles():
             parent=styles['Heading1'],
             fontName='Helvetica-Bold',
             fontSize=22,
-            textColor=colors.HexColor('#1a1a1a'),
+            textColor=custom_colors['primary'],
             spaceBefore=25,
             spaceAfter=15,
             alignment=TA_LEFT,
@@ -411,6 +468,7 @@ def create_custom_styles():
     
     return custom_styles
 
+
 def process_section_content(content, styles, elements):
     """Process section content and add appropriate styling"""
     main_sections = {
@@ -453,8 +511,59 @@ def process_section_content(content, styles, elements):
                 if clean_paragraph:
                     elements.append(Paragraph(clean_text(clean_paragraph), styles['content']))
                     elements.append(Spacer(1, 12))
-
-def generate_pdf(comprehensive_summary, profile_info, selected_areas, company_summary):
+def create_input_summary_section(profile_info, business_priorities, selected_areas, styles):
+    """Create a section summarizing all user inputs"""
+    elements = []
+    
+    elements.append(Paragraph("Business Input Summary", styles['title']))
+    elements.append(Spacer(1, 12))
+    
+    # Business Model & Products/Services
+    elements.extend([
+        Paragraph("Business Overview", styles['subheading']),
+        Table(
+            [[Paragraph("Business Model", styles['table_header']),
+              Paragraph(clean_text(profile_info['business_model']), styles['content'])],
+             [Paragraph("Products/Services", styles['table_header']),
+              Paragraph(clean_text(profile_info['products_services']), styles['content'])],
+             [Paragraph("Competitive Advantage", styles['table_header']),
+              Paragraph(clean_text(profile_info['differentiation']), styles['content'])]],
+            colWidths=[2*inch, 5*inch],
+            style=TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8fafc')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e2e8f0')),
+                ('PADDING', (0, 0), (-1, -1), 12)
+            ])
+        )
+    ])
+    
+    elements.append(Spacer(1, 20))
+    
+    # Business Priorities
+    elements.extend([
+        Paragraph("Stated Business Priorities", styles['subheading']),
+        Paragraph(clean_text(business_priorities), styles['content'])
+    ])
+    
+    elements.append(Spacer(1, 20))
+    
+    # Selected Areas for Analysis
+    elements.extend([
+        Paragraph("Selected Focus Areas", styles['subheading']),
+        Table(
+            [[Paragraph("• " + area, styles['content'])] for area in selected_areas],
+            colWidths=[7*inch],
+            style=TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e2e8f0')),
+                ('PADDING', (0, 0), (-1, -1), 12)
+            ])
+        )
+    ])
+    
+    elements.append(PageBreak())
+    return elements
+def generate_pdf(comprehensive_summary, profile_info, selected_areas, company_summary, business_priorities):
     """Generate the complete PDF report with enhanced styling and layout"""
     buffer = io.BytesIO()
 
@@ -480,17 +589,17 @@ def generate_pdf(comprehensive_summary, profile_info, selected_areas, company_su
         # Build elements list
         elements = []
 
-        # Front page
-        if profile_info:
-            elements.extend(create_front_page(styles, profile_info))
-        else:
-            elements.append(Paragraph("Profile Information Missing", styles['error']))
+        # Front page with business priorities
+        elements.extend(create_front_page(styles, profile_info, business_priorities))
 
         # Table of Contents
         content_sections = {
             'business_areas': selected_areas
         }
         create_dynamic_toc(elements, styles, content_sections)
+
+        # Input Summary Section
+        elements.extend(create_input_summary_section(profile_info, business_priorities, selected_areas, styles))
 
         # Executive Summary
         elements.append(Paragraph("Executive Summary", styles['title']))
@@ -993,11 +1102,13 @@ def clean_text(text):
     text = text.replace('...', '.')
     text = text.replace('..', '.')
     return text.strip()
-def create_front_page(styles, profile_info):
-    """Create front page with MyFinB logo placement"""
+def create_front_page(styles, profile_info, business_priorities):
+    """
+    Create front page with enhanced styling and business priorities
+    """
     elements = []
     
-    # Create table for logo placement
+    # Create logo placement
     if os.path.exists("smeimge.jpg") and os.path.exists("finb.jpg"):
         logo_table = Table(
             [[
@@ -1014,21 +1125,74 @@ def create_front_page(styles, profile_info):
         )
         elements.append(logo_table)
     
+    # Add title and metadata
     elements.extend([
         Spacer(1, 1.5*inch),
-        Paragraph("Business Analysis Report for SME", styles['front_title']),
-        Paragraph("Lite Version", styles['front_subtitle']),
+        Paragraph("Business Analysis Report", styles['front_title']),
+        Paragraph("Comprehensive SME Assessment", styles['front_subtitle']),
+        Spacer(1, 0.5*inch),
+    ])
+
+    # Add company profile summary
+    profile_data = [
+        ["Industry:", profile_info.get('industry', 'N/A')],
+        ["Revenue Range:", profile_info.get('revenue_range', 'N/A')],
+        ["Staff Strength:", profile_info.get('staff_strength', 'N/A')],
+        ["Customer Base:", profile_info.get('customer_base', 'N/A')]
+    ]
+    
+    profile_table = Table(
+        [[Paragraph("Company Profile", styles['profile_header'])]] +
+        [[Paragraph(key, styles['table_header']), 
+          Paragraph(str(value), styles['profile_content'])] for key, value in profile_data],
+        colWidths=[2*inch, 5*inch],
+        style=TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f8fafc')),
+            ('SPAN', (0, 0), (-1, 0)),  # Span the header across all columns
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e2e8f0')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#2b6cb0')),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('TOPPADDING', (0, 1), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+            ('BACKGROUND', (0, 1), (0, -1), colors.HexColor('#f8fafc')),
+            ('ALIGN', (0, 1), (0, -1), 'RIGHT')
+        ])
+    )
+    
+    elements.append(profile_table)
+    elements.append(Spacer(1, 0.5*inch))
+
+    # Add business priorities section
+    # if business_priorities:
+    #     elements.extend([
+    #         Paragraph("Business Priorities", styles['section_header']),
+    #         Spacer(1, 0.1*inch),
+    #         Paragraph(clean_text(business_priorities), styles['priorities_content'])
+    #     ])
+    
+    # elements.append(Spacer(1, 0.5*inch))
+
+    # Add report metadata and confidentiality notice
+    elements.extend([
         Paragraph(
-            f"Generated on: {datetime.datetime.now().strftime('%B %d, %Y %I:%M %p')}", 
-            styles['front_date']
+            f"Generated on: {datetime.datetime.now().strftime('%B %d, %Y')}",
+            styles['metadata']
         ),
+        Spacer(1, 0.2*inch),
+        Paragraph("CONFIDENTIAL DOCUMENT", styles['confidential']),
+        Spacer(1, 0.5*inch),
         PageBreak()
     ])
     
     return elements
 
 def create_error_pdf():
-    """Create a simple PDF with error message if generation fails"""
+    """
+    Create a simple PDF with error message if generation fails
+    """
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -1042,13 +1206,13 @@ def create_error_pdf():
     styles = getSampleStyleSheet()
     elements = []
     
-    # Add logos to error page
+    # Add logos if available
     if os.path.exists("smeimge.jpg") and os.path.exists("finb.jpg"):
-        logo_left = Image("smeimge.jpg", width=2.5*inch, height=1.5*inch)
-        logo_right = Image("finb.jpg", width=2.5*inch, height=1.5*inch)
-        
         logo_table = Table(
-            [[logo_left, logo_right]], 
+            [[
+                Image("smeimge.jpg", width=2*inch, height=0.5*inch),
+                Image("finb.jpg", width=1.5*inch, height=0.5*inch)
+            ]], 
             colWidths=[4*inch, 4*inch],
             style=TableStyle([
                 ('ALIGN', (0, 0), (0, 0), 'LEFT'),
@@ -1074,18 +1238,25 @@ def create_error_pdf():
         )
     ])
     
-    # Build the error PDF
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
+    try:
+        doc.build(elements)
+        buffer.seek(0)
+        return buffer
+    except:
+        # If even the error PDF fails, return an empty buffer
+        buffer.seek(0)
+        return buffer
 
-def validate_pdf_inputs(profile_info, selected_areas, company_summary, comprehensive_summary):
+def validate_pdf_inputs(profile_info, selected_areas, company_summary, comprehensive_summary, business_priorities):
     """
     Validate all required inputs for PDF generation
     Returns tuple (is_valid, error_message)
     """
     if not profile_info:
         return False, "Missing business profile information"
+    
+    if not business_priorities:
+        return False, "Missing business priorities"
     
     required_fields = ['industry', 'revenue_range', 'business_model']
     missing_fields = [field for field in required_fields if not profile_info.get(field)]
@@ -1103,23 +1274,24 @@ def validate_pdf_inputs(profile_info, selected_areas, company_summary, comprehen
     
     return True, ""
 
-def generate_business_analysis_pdf(comprehensive_summary, profile_info, selected_areas, company_summary):
+
+def generate_business_analysis_pdf(comprehensive_summary, profile_info, selected_areas, company_summary, business_priorities):
     """
     Wrapper function to handle PDF generation with error handling
     """
     try:
-        return generate_pdf(comprehensive_summary, profile_info, selected_areas, company_summary)
+        return generate_pdf(comprehensive_summary, profile_info, selected_areas, company_summary, business_priorities)
     except Exception as e:
         print(f"Error generating PDF: {str(e)}")
         return create_error_pdf()
 
-def create_business_analysis_report(profile_info, selected_areas, company_summary, comprehensive_summary):
+def create_business_analysis_report(profile_info, selected_areas, company_summary, comprehensive_summary, business_priorities):
     """
     Main function to create the business analysis PDF report
     """
     # Validate inputs
     is_valid, error_message = validate_pdf_inputs(
-        profile_info, selected_areas, company_summary, comprehensive_summary
+        profile_info, selected_areas, company_summary, comprehensive_summary, business_priorities
     )
     
     if not is_valid:
@@ -1132,14 +1304,14 @@ def create_business_analysis_report(profile_info, selected_areas, company_summar
             comprehensive_summary,
             profile_info,
             selected_areas,
-            company_summary
+            company_summary,
+            business_priorities
         )
         
         return pdf_buffer
     except Exception as e:
         st.error(f"Error generating report: {str(e)}")
         return create_error_pdf()
-
 def offer_pdf_download(pdf_buffer):
     """Helper function to offer PDF download in Streamlit"""
     st.download_button(
@@ -1266,27 +1438,25 @@ def main():
                 )
                 
                 # Display analyses
-                # with st.expander("Company Profile Analysis", expanded=True):
-                #      st.markdown("### Company Summary")
-                #      st.write(company_summary)
-                    
-                #     st.markdown("### Detailed Profile Information")
-                #     for key, value in profile_info.items():
-                #         st.markdown(f"**{key.replace('_', ' ').title()}**")
-                #         st.write(value)
-                
                 with st.expander("Comprehensive Analysis and Advisory Recommendations", expanded=True):
-                     st.markdown("### Complete Business Analysis")
-                     st.write(comprehensive_summary)
+                    st.markdown("### Complete Business Analysis")
+                    st.write(comprehensive_summary)
                 
                 # Generate and offer PDF download
-                pdf_buffer = generate_pdf(comprehensive_summary,profile_info,st.session_state.user_data['selected_areas'],company_summary)
+                pdf_buffer = generate_pdf(
+                    comprehensive_summary,
+                    profile_info,
+                    st.session_state.user_data['selected_areas'],
+                    company_summary,
+                    st.session_state.user_data.get('raw_priorities', '')  # Pass business priorities
+                )
+                
                 st.download_button(
                     label="Download Complete Analysis as PDF",
                     data=pdf_buffer,
                     file_name=f"business_analysis_{datetime.datetime.now().strftime('%Y%m%d')}.pdf",
                     mime="application/pdf"
-                    
                 )
+
 if __name__ == "__main__":
     main()
