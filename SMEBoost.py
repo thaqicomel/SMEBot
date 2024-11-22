@@ -1181,9 +1181,9 @@ def create_front_page(styles, profile_info, business_priorities):
             f"Generated on: {datetime.datetime.now().strftime('%B %d, %Y')}",
             styles['metadata']
         ),
-        Spacer(1, 0.2*inch),
-        Paragraph("CONFIDENTIAL DOCUMENT", styles['confidential']),
-        Spacer(1, 0.5*inch),
+        # Spacer(1, 0.2*inch),
+        # Paragraph("CONFIDENTIAL DOCUMENT", styles['confidential']),
+        # Spacer(1, 0.5*inch),
         PageBreak()
     ])
     
